@@ -6,8 +6,8 @@ public class Health : MonoBehaviour
     public int maxHealth = 100;
     public int currentHealth;
 
-    // event: (current, max) — pod³¹cz UI póŸniej
     public event Action<int, int> OnHealthChanged;
+    public event Action<Health> OnDeath;
 
     public bool IsDead => currentHealth <= 0;
 
@@ -29,10 +29,7 @@ public class Health : MonoBehaviour
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
         if (IsDead)
-        {
-            // tu póŸniej: animacja KO, koniec rundy itd.
-            Debug.Log($"{name} zosta³ pokonany!");
-        }
+            OnDeath?.Invoke(this);
     }
 
     public void ResetHealth()

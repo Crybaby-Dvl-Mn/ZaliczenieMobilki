@@ -38,6 +38,12 @@ public class FighterController : MonoBehaviour
     [Header("Referencje")]
     public Transform attackOrigin;
 
+    [Header("Battle Integration")]
+    [Tooltip("Wyłączane przez BattleManager po zakończeniu walki.")]
+    public bool inputEnabled = true;
+    [Tooltip("Tag triggera pod areną — wypadnięcie = KO.")]
+    public string deathZoneTag = "DeathZone";
+
     // --- stan ---
     public bool IsCrouching { get; private set; }
     public bool IsBlockingHigh { get; private set; }
@@ -81,6 +87,10 @@ public class FighterController : MonoBehaviour
         if (_attackCooldownTimer > 0f) _attackCooldownTimer -= Time.deltaTime;
 
         UpdateGrounded();
+
+        // Gdy walka nieaktywna (input wyłączony przez BattleManager) — nie przetwarzaj inputu
+        if (!inputEnabled) return;
+
         if (_health.IsDead) return;
 
         UpdateFacing();
@@ -256,7 +266,72 @@ public class FighterController : MonoBehaviour
         if (_anim != null) _anim.SetTrigger("Hit");
     }
 
-    // Rysowanie groundCheck w Scene view — pomocne przy dostrajaniu
+    // ---------- BATTLE INTEGRATION ----------
+
+    /// <summary>
+    /// Reset do stanu początkowego — wywoływane przez BattleManager
+    /// na starcie walki i przy dogrywce.
+    /// </summary>
+    public void ResetForBattle(Vector3 spawnPosition)
+    {
+        transform.position = spawnPosition;
+
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector2.zero;
+            _rb.angularVelocity = 0f;
+        }
+
+        _hitstunTimer = 0f;
+        _attackCooldownTimer = 0f;
+        _isAttacking = false;
+
+        SetCrouch(false);
+        IsBlockingHigh = false;
+        IsBlockingLow = false;
+
+        if (_anim != null)
+        {
+            _anim.SetBool("isWalking", false);
+            _anim.SetBool("isBlockingHigh", false);
+            _anim.SetBool("isBlockingLow", false);
+            _anim.SetBool("isCrouching", false);
+        }
+
+        if (_health != null)
+            _health.ResetHealth();
+
+        // Reset facing — domyślnie w prawo; auto-facing skoryguje w Update
+        IsFacingRight = true;
+        var scale = transform.localScale;
+        scale.x = Mathf.Abs(scale.x);
+        transform.localScale = scale;
+
+        inputEnabled = true;
+        gameObject.SetActive(true);
+    }
+
+    /// <summary>
+    /// Wyłącza input wojownika (koniec walki / KO).
+    /// </summary>
+    public void DisableInput()
+    {
+        inputEnabled = false;
+        if (_rb != null)
+            _rb.linearVelocity = Vector2.zero;
+    }
+
+    // ---------- WYPADNIĘCIE ZA ARENĘ = KO ----------
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!other.CompareTag(deathZoneTag)) return;
+        if (_health == null || _health.IsDead) return;
+
+        // Zabij natychmiast — Health wywoła OnDeath, BattleManager to złapie
+        _health.TakeDamage(_health.currentHealth);
+    }
+
+    // ---------- GIZMOS ----------
     void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
