@@ -234,7 +234,7 @@ MonoBehaviour:
   leftKey: 276
   rightKey: 275
   crouchKey: 274
-  jumpKey: 119
+  jumpKey: 273
   highAttackKey: 108
   lowAttackKey: 107
   highAttack: {fileID: 0}
