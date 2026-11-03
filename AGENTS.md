@@ -2,7 +2,7 @@
 - Project name: ZaliczenieMobilki
 - Unity version: Unity 6000.2.8f1
 - Active game object:
-  - Name: BattleManager
+  - Name: UI
   - Tag: Untagged
-  - Layer: Default
+  - Layer: UI
 <!-- UNITY CODE ASSIST INSTRUCTIONS END -->

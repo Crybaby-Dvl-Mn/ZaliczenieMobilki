@@ -253,7 +253,7 @@ MonoBehaviour:
   moveSpeed: 5
   crouchSpeedMultiplier: 0.4
   jumpForce: 12
-  groundCheck: {fileID: 0}
+  groundCheck: {fileID: 2205108365709339692}
   groundCheckRadius: 0.15
   groundLayer:
     serializedVersion: 2
@@ -268,8 +268,8 @@ MonoBehaviour:
   jumpKey: 119
   highAttackKey: 120
   lowAttackKey: 99
-  highAttack: {fileID: 0}
-  lowAttack: {fileID: 0}
+  highAttack: {fileID: 11400000, guid: dbe2b0fec46d94e4f8f6110afc6b61ff, type: 2}
+  lowAttack: {fileID: 11400000, guid: f9c7a8e7919844e459c8d1b631c685ca, type: 2}
   attackOrigin: {fileID: 2982244388643471123}
   inputEnabled: 1
   deathZoneTag: DeathZone
