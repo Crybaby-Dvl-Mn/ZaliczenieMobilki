@@ -12,7 +12,7 @@ public class FighterController : MonoBehaviour
 
     [Header("Skok")]
     public float jumpForce = 12f;
-    [Tooltip("Pusty obiekt pod stopami postaci — służy do wykrywania ziemi.")]
+    [Tooltip("Pusty obiekt pod stopami postaci - sluzy do wykrywania ziemi.")]
     public Transform groundCheck;
     public float groundCheckRadius = 0.15f;
     public LayerMask groundLayer;
@@ -23,7 +23,7 @@ public class FighterController : MonoBehaviour
     public float standColliderOffsetY = 0f;
     public float crouchColliderOffsetY = -0.3f;
 
-    [Header("Sterowanie (przypisz w edytorze — inne dla każdego gracza)")]
+    [Header("Sterowanie (przypisz w edytorze - inne dla kazdego gracza)")]
     public KeyCode leftKey = KeyCode.A;
     public KeyCode rightKey = KeyCode.D;
     public KeyCode crouchKey = KeyCode.S;
@@ -39,9 +39,9 @@ public class FighterController : MonoBehaviour
     public Transform attackOrigin;
 
     [Header("Battle Integration")]
-    [Tooltip("Wyłączane przez BattleManager po zakończeniu walki.")]
+    [Tooltip("Wylaczane przez BattleManager po zakonczeniu walki.")]
     public bool inputEnabled = true;
-    [Tooltip("Tag triggera pod areną — wypadnięcie = KO.")]
+    [Tooltip("Tag triggera pod arena - wypadniecie = KO.")]
     public string deathZoneTag = "DeathZone";
 
     // --- stan ---
@@ -63,6 +63,7 @@ public class FighterController : MonoBehaviour
     private float _hitstunTimer;
     private float _attackCooldownTimer;
     private bool _isAttacking;
+    private float _moveInput = 0f;
 
     public Health Health => _health;
     public Transform AttackOrigin => attackOrigin != null ? attackOrigin : transform;
@@ -77,10 +78,26 @@ public class FighterController : MonoBehaviour
 
     void Start()
     {
-        if (opponent == null)
-            Debug.LogWarning($"[{name}] Brak przypisanego opponent. Auto-facing i blok kierunkowy nie będą działać.", this);
+        EnsureOpponent();
+
         if (groundCheck == null)
-            Debug.LogWarning($"[{name}] Brak groundCheck — skok i wykrywanie ziemi nie będą działać.", this);
+            Debug.LogWarning($"[{name}] Brak groundCheck - skok i wykrywanie ziemi nie beda dzialac.", this);
+    }
+
+    void EnsureOpponent()
+    {
+        if (opponent == null)
+        {
+            var all = FindObjectsByType<FighterController>(FindObjectsSortMode.None);
+            foreach (var f in all)
+            {
+                if (f != this)
+                {
+                    opponent = f;
+                    break;
+                }
+            }
+        }
     }
 
     void Update()
@@ -90,10 +107,12 @@ public class FighterController : MonoBehaviour
 
         UpdateGrounded();
 
-        if (!inputEnabled) return;
-        if (_health.IsDead) return;
-
+        // Ciagle upewniamy sie ze gracze sie obracaja do siebie (nawet jesli input wylaczony)
         UpdateFacing();
+
+        if (!inputEnabled) return;
+        if (_health != null && _health.IsDead) return;
+
         HandleCrouch();
         HandleBlock();
         HandleMovement();
@@ -108,21 +127,31 @@ public class FighterController : MonoBehaviour
         IsGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
 
-    // ---------- AUTO-FACING ----------
+    // ---------- AUTO-FACING (OBRACANIE W STRONE DRUGIEGO GRACZA) ----------
     void UpdateFacing()
     {
-        if (opponent == null) return;
+        if (opponent == null)
+        {
+            EnsureOpponent();
+            if (opponent == null) return;
+        }
+
         if (_isAttacking) return;
         if (IsInHitstun) return;
-        if (opponent.Health.IsDead) return;
+        if (opponent.Health != null && opponent.Health.IsDead) return;
 
-        IsFacingRight = opponent.transform.position.x > transform.position.x;
-        var scale = transform.localScale;
-        scale.x = Mathf.Abs(scale.x) * (IsFacingRight ? 1f : -1f);
-        transform.localScale = scale;
+        // Okreslamy kierunek patrzenia na podstawie pozycji X przeciwnika
+        bool shouldFaceRight = opponent.transform.position.x >= transform.position.x;
+        if (shouldFaceRight != IsFacingRight)
+        {
+            IsFacingRight = shouldFaceRight;
+            var scale = transform.localScale;
+            scale.x = Mathf.Abs(scale.x) * (IsFacingRight ? 1f : -1f);
+            transform.localScale = scale;
+        }
     }
 
-    // ---------- KUCAŃ ----------
+    // ---------- KUCANIE ----------
     void HandleCrouch()
     {
         if (IsInHitstun) return;
@@ -154,7 +183,7 @@ public class FighterController : MonoBehaviour
     // ---------- BLOK ----------
     void HandleBlock()
     {
-        bool canBlock = IsGrounded && opponent != null && !opponent.Health.IsDead && !_isAttacking && !IsInHitstun;
+        bool canBlock = IsGrounded && opponent != null && opponent.Health != null && !opponent.Health.IsDead && !_isAttacking && !IsInHitstun;
         bool holdingBack = false;
         if (canBlock)
         {
@@ -178,9 +207,13 @@ public class FighterController : MonoBehaviour
             if (_anim != null) _anim.SetBool("isWalking", false);
             return;
         }
-        float h = 0f;
+
+        float h = _moveInput;
         if (Input.GetKey(leftKey)) h -= 1f;
         if (Input.GetKey(rightKey)) h += 1f;
+
+        h = Mathf.Clamp(h, -1f, 1f);
+
         float speed = IsCrouching ? moveSpeed * crouchSpeedMultiplier : moveSpeed;
         _rb.linearVelocity = new Vector2(h * speed, _rb.linearVelocity.y);
         if (_anim != null) _anim.SetBool("isWalking", Mathf.Abs(h) > 0.01f);
@@ -193,6 +226,14 @@ public class FighterController : MonoBehaviour
         if (_isAttacking || IsInHitstun) return;
         if (IsCrouching) return;
         if (Input.GetKeyDown(jumpKey))
+        {
+            ExecuteJump();
+        }
+    }
+
+    private void ExecuteJump()
+    {
+        if (_rb != null)
         {
             _rb.linearVelocity = new Vector2(_rb.linearVelocity.x, jumpForce);
             if (_anim != null) _anim.SetTrigger("Jump");
@@ -215,7 +256,8 @@ public class FighterController : MonoBehaviour
         _isAttacking = true;
         var executor = GetComponent<AttackExecutor>();
         if (executor == null) executor = gameObject.AddComponent<AttackExecutor>();
-        executor.Execute(this, data, () => {
+        executor.Execute(this, data, () =>
+        {
             _isAttacking = false;
             _attackCooldownTimer = data.recoveryTime;
         });
@@ -224,7 +266,7 @@ public class FighterController : MonoBehaviour
     // ---------- OTRZYMYWANIE CIOSU ----------
     public void ReceiveHit(AttackData attack, Vector2 attackerPosition)
     {
-        if (_health.IsDead) return;
+        if (_health != null && _health.IsDead) return;
         bool blocked = false;
         if (IsBlockingLow) blocked = true;
         else if (IsBlockingHigh && attack.attackType == AttackType.High) blocked = true;
@@ -233,19 +275,20 @@ public class FighterController : MonoBehaviour
             if (_anim != null) _anim.SetTrigger("BlockHit");
             return;
         }
-        _health.TakeDamage(attack.GetDamage());
+
+        if (_health != null) _health.TakeDamage(attack.GetDamage());
         _hitstunTimer = attack.GetHitstunDuration();
         Vector2 dir = ((Vector2)transform.position - attackerPosition).normalized;
         if (Mathf.Abs(dir.x) < 0.01f) dir.x = IsFacingRight ? -1f : 1f;
-        _rb.linearVelocity = new Vector2(dir.x * attack.GetKnockbackForce(), _rb.linearVelocity.y);
+        if (_rb != null) _rb.linearVelocity = new Vector2(dir.x * attack.GetKnockbackForce(), _rb.linearVelocity.y);
         if (_anim != null) _anim.SetTrigger("Hit");
-        // Wizualizacja otrzymanego ciosu (czerwony flash)
+
+        // Wizualizacja otrzymanego ciosu
         var vis = GetComponent<AttackVisualizer>();
         if (vis != null) vis.PlayReceiveHit();
     }
 
     // ---------- BATTLE INTEGRATION ----------
-    /// <summary>Reset do stanu początkowego — wywoływane przez BattleManager na starcie walki i przy dogrywce.</summary>
     public void ResetForBattle(Vector3 spawnPosition)
     {
         transform.position = spawnPosition;
@@ -257,6 +300,7 @@ public class FighterController : MonoBehaviour
         _hitstunTimer = 0f;
         _attackCooldownTimer = 0f;
         _isAttacking = false;
+        _moveInput = 0f;
         SetCrouch(false);
         IsBlockingHigh = false;
         IsBlockingLow = false;
@@ -267,16 +311,26 @@ public class FighterController : MonoBehaviour
             _anim.SetBool("isBlockingLow", false);
             _anim.SetBool("isCrouching", false);
         }
+
+        if (_health != null)
+        {
+            _health.ResetHealth();
+        }
+
+        EnsureOpponent();
+        UpdateFacing();
+        inputEnabled = true;
     }
 
     public void DisableInput()
     {
         inputEnabled = false;
+        _moveInput = 0f;
         if (_rb != null)
             _rb.linearVelocity = Vector2.zero;
     }
 
-    // ---------- KO (wyjście poza arena) ----------
+    // ---------- KO (wyjscie poza arene) ----------
     void OnTriggerEnter2D(Collider2D other)
     {
         if (!other.CompareTag(deathZoneTag)) return;
@@ -284,7 +338,6 @@ public class FighterController : MonoBehaviour
         _health.TakeDamage(_health.maxHealth);
     }
 
-    // ---------- GIZMOS ----------
     void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
@@ -293,4 +346,39 @@ public class FighterController : MonoBehaviour
             Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
         }
     }
+
+    // ==================== MOBILE INPUT HELPERS ====================
+    #region Mobile-input helpers
+    public void MobilePressLeft(bool pressed)
+    {
+        if (pressed) _moveInput = -1f;
+        else if (_moveInput < 0f) _moveInput = 0f;
+    }
+
+    public void MobilePressRight(bool pressed)
+    {
+        if (pressed) _moveInput = 1f;
+        else if (_moveInput > 0f) _moveInput = 0f;
+    }
+
+    public void MobileJump()
+    {
+        if (IsGrounded && !IsCrouching && !_isAttacking && !IsInHitstun)
+        {
+            ExecuteJump();
+        }
+    }
+
+    public void MobileHighAttack()
+    {
+        if (highAttack != null && inputEnabled && !IsInHitstun && !_isAttacking && _attackCooldownTimer <= 0f)
+            StartAttack(highAttack);
+    }
+
+    public void MobileLowAttack()
+    {
+        if (lowAttack != null && inputEnabled && IsGrounded && !IsInHitstun && !_isAttacking && _attackCooldownTimer <= 0f)
+            StartAttack(lowAttack);
+    }
+    #endregion
 }
