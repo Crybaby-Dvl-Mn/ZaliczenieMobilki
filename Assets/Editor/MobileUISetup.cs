@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 
 /// <summary>
 /// Tworzy mobilne UI dla P2, pasek zdrowia w procentach oraz AttackVisualizer.
+/// Menu: Tools -> Mobile UI Setup -> Utworz Mobile UI + Paski Zdrowia
 /// </summary>
 public static class MobileUISetup
 {
@@ -63,7 +64,6 @@ public static class MobileUISetup
         GameObject p2go = GameObject.Find("P2");
         if (p2go != null) mobileUI.player2 = p2go.GetComponent<FighterController>();
 
-        // BattleHealthUI
         BattleHealthUI healthUI = canvasGO.GetComponent<BattleHealthUI>();
         if (healthUI == null) healthUI = canvasGO.AddComponent<BattleHealthUI>();
 
@@ -85,21 +85,21 @@ public static class MobileUISetup
 
         // Przyciski P2:
         // Lewo / Prawo
-        MakeButton(canvasGO, "Btn_Left", "<", new Vector2(90, 90), new Vector2(110, 110), new Color(0.2f, 0.4f, 0.85f, 0.8f), mobileUI, "OnLeftDown", "OnLeftUp");
-        MakeButton(canvasGO, "Btn_Right", ">", new Vector2(210, 90), new Vector2(110, 110), new Color(0.2f, 0.4f, 0.85f, 0.8f), mobileUI, "OnRightDown", "OnRightUp");
+        MakeButton(canvasGO, "Btn_Left", "<", new Vector2(90, 90), new Vector2(110, 110), new Color(0.2f, 0.4f, 0.85f, 0.8f), mobileUI, MobileButton.ActionType.Left);
+        MakeButton(canvasGO, "Btn_Right", ">", new Vector2(210, 90), new Vector2(110, 110), new Color(0.2f, 0.4f, 0.85f, 0.8f), mobileUI, MobileButton.ActionType.Right);
         // Skok
-        MakeButton(canvasGO, "Btn_Jump", "^", new Vector2(150, 210), new Vector2(110, 110), new Color(0.2f, 0.75f, 0.3f, 0.8f), mobileUI, "OnJump", null);
+        MakeButton(canvasGO, "Btn_Jump", "^", new Vector2(150, 210), new Vector2(110, 110), new Color(0.2f, 0.75f, 0.3f, 0.8f), mobileUI, MobileButton.ActionType.Jump);
 
-        // High Attack & Low Attack (po prawej stronie dolnej czesci)
-        MakeButton(canvasGO, "Btn_HighAttack", "HI", new Vector2(-210, 90), new Vector2(110, 110), new Color(0.85f, 0.35f, 0.1f, 0.85f), mobileUI, "OnHighAttack", null);
-        MakeButton(canvasGO, "Btn_LowAttack", "LO", new Vector2(-90, 90), new Vector2(110, 110), new Color(0.7f, 0.2f, 0.8f, 0.85f), mobileUI, "OnLowAttack", null);
+        // High Attack & Low Attack
+        MakeButton(canvasGO, "Btn_HighAttack", "HI", new Vector2(-210, 90), new Vector2(110, 110), new Color(0.85f, 0.35f, 0.1f, 0.85f), mobileUI, MobileButton.ActionType.HighAttack);
+        MakeButton(canvasGO, "Btn_LowAttack", "LO", new Vector2(-90, 90), new Vector2(110, 110), new Color(0.7f, 0.2f, 0.8f, 0.85f), mobileUI, MobileButton.ActionType.LowAttack);
 
         EditorUtility.SetDirty(canvasGO);
     }
 
     static void MakeButton(GameObject canvas, string name, string label,
         Vector2 anchoredPos, Vector2 size, Color color,
-        MobileUI mobileUI, string downMethod, string upMethod)
+        MobileUI mobileUI, MobileButton.ActionType actionType)
     {
         GameObject btnGO = new GameObject(name);
         btnGO.transform.SetParent(canvas.transform, false);
@@ -134,23 +134,9 @@ public static class MobileUISetup
         txt.fontStyle = FontStyle.Bold;
         txt.raycastTarget = false;
 
-        EventTrigger trigger = btnGO.AddComponent<EventTrigger>();
-        AddTrigger(trigger, EventTriggerType.PointerDown, mobileUI, downMethod);
-        if (!string.IsNullOrEmpty(upMethod))
-        {
-            AddTrigger(trigger, EventTriggerType.PointerUp, mobileUI, upMethod);
-        }
-    }
-
-    static void AddTrigger(EventTrigger trigger, EventTriggerType type, MobileUI target, string methodName)
-    {
-        var entry = new EventTrigger.Entry { eventID = type };
-        var method = typeof(MobileUI).GetMethod(methodName);
-        if (method != null)
-        {
-            var action = (UnityEngine.Events.UnityAction)System.Delegate.CreateDelegate(typeof(UnityEngine.Events.UnityAction), target, method);
-            entry.callback.AddListener(action);
-            trigger.triggers.Add(entry);
-        }
+        // Komponent obslugujacy dotyk/mysz
+        MobileButton mb = btnGO.AddComponent<MobileButton>();
+        mb.action = actionType;
+        mb.mobileUI = mobileUI;
     }
 }
